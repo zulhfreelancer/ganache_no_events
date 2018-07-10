@@ -1,3 +1,7 @@
+const fs = require('fs');
+const abiDecoder = require('abi-decoder');
+const truffleAssert = require('truffle-assertions');
+
 var foo = artifacts.require("./Foo");
 var bar = artifacts.require("./Bar");
 
@@ -13,15 +17,18 @@ contract('FooBar', function(accounts) {
     return JSON.stringify(logs, null, 2);
   }
 
-
+  function getAbi(contractName) {
+    let c = JSON.parse(fs.readFileSync(`./build/contracts/${contractName}.json`, `utf8`));
+    return c.abi;
+  }
 
   it("Foo#doSomething", async function(){
-    var t = await f.doSomething();
-    var s = `--------------------------------------------------------------------------\n`;
-    s    += `TxHash: ${t.tx}\n`;
-    s    += `--------------------------------------------------------------------------\n`;
-    s    += stringify(t.logs);
-    console.log(s);
+    // var t = await f.doSomething();
+    // var s = `--------------------------------------------------------------------------\n`;
+    // s    += `TxHash: ${t.tx}\n`;
+    // s    += `--------------------------------------------------------------------------\n`;
+    // s    += stringify(t.logs);
+    // console.log(s);
 
     /*
       --------------------------------------------------------------------------
@@ -48,12 +55,12 @@ contract('FooBar', function(accounts) {
 
 
   it("Bar#doSomething", async function(){
-    var t = await b.doSomething();
-    var s = `--------------------------------------------------------------------------\n`;
-    s    += `TxHash: ${t.tx}\n`;
-    s    += `--------------------------------------------------------------------------\n`;
-    s    += stringify(t.logs);
-    console.log(s);
+    // var t = await b.doSomething();
+    // var s = `--------------------------------------------------------------------------\n`;
+    // s    += `TxHash: ${t.tx}\n`;
+    // s    += `--------------------------------------------------------------------------\n`;
+    // s    += stringify(t.logs);
+    // console.log(s);
 
     /*
       --------------------------------------------------------------------------
@@ -84,8 +91,34 @@ contract('FooBar', function(accounts) {
     var s = `--------------------------------------------------------------------------\n`;
     s    += `TxHash: ${t.tx}\n`;
     s    += `--------------------------------------------------------------------------\n`;
-    s    += stringify(t.logs);
+    // s    += stringify(t);
     console.log(s);
+
+    // get ABI
+    let abi = getAbi('Bar');
+    // get log at index, store in an array
+    let log = [t.receipt.logs[1]];
+    // set ABI into decoder
+    abiDecoder.addABI(abi);
+    // decode log
+    let _decoded = abiDecoder.decodeLogs(log);
+    let decodedLog = _decoded[0];
+    // empty object that we will populate and return later
+    let txObj = {};
+    let args = {};
+    txObj.tx = t.tx;
+    txObj.logs = [{"event":decodedLog.name}];
+    for (var i = 0; i < decodedLog.events.length; i++) {
+      let n = decodedLog.events[i].name;
+      let v = decodedLog.events[i].value;
+      args[`${n}`] = v;
+    }
+    txObj.logs[0].args = args;
+    console.log( stringify(txObj) );
+
+    truffleAssert.eventEmitted(txObj, 'LogAlphabet', (ev) => {
+      return ev.number1 == 200 && ev.number2 == 300;
+    });
 
     /*
       --------------------------------------------------------------------------
